@@ -1,26 +1,26 @@
 import Foundation
 import Observation
 
-/// Bir hatırlatma oturumunun zamanlamasını tutar: ne zaman bitecek,
-/// sıradaki hatırlatma ne zaman, şimdiye kadar kaç hatırlatma yapıldı.
+/// Keeps the timing of one reminder session: when it ends, when the next reminder is
+/// due, and how many reminders have fired so far.
 @MainActor
 @Observable
 final class ReminderSession {
     private(set) var isActive = false
-    private(set) var endDate: Date?          // nil = durdurana kadar
+    private(set) var endDate: Date?          // nil = until stopped
     private(set) var nextReminder: Date?
     private(set) var reminderCount = 0
-    private(set) var now = Date()            // her saniye güncellenir, arayüz buna bakar
+    private(set) var now = Date()            // updated every second; the UI reads this
 
     private var interval: TimeInterval = 0
     private var ticker: Task<Void, Never>?
 
-    /// Hatırlatma zamanı geldiğinde çağrılır (adım 3'te panel + ses buraya bağlanacak).
+    /// Called when a reminder is due (the panel + sound are hooked up here).
     var onReminder: () -> Void = {}
-    /// Oturum süresi dolduğunda çağrılır.
+    /// Called when the session time runs out.
     var onFinish: () -> Void = {}
 
-    /// sessionMinutes 0 ise oturum durdurulana kadar sürer.
+    /// A sessionMinutes of 0 means the session runs until stopped.
     func start(sessionMinutes: Int, intervalMinutes: Int, at start: Date = Date()) {
         interval = TimeInterval(intervalMinutes * 60)
         endDate = sessionMinutes > 0 ? start.addingTimeInterval(TimeInterval(sessionMinutes * 60)) : nil
@@ -46,7 +46,7 @@ final class ReminderSession {
         nextReminder = nil
     }
 
-    /// Her saniye çalışır. Zamanı dışarıdan alabildiği için test edilebilir.
+    /// Runs every second. Takes the time as a parameter so it can be tested.
     func tick(at time: Date = Date()) {
         guard isActive else { return }
         now = time
@@ -59,8 +59,8 @@ final class ReminderSession {
 
         if let next = nextReminder, time >= next {
             reminderCount += 1
-            // Bir sonrakini "şimdi"den say: Mac uykudan uyanınca biriken hatırlatmalar
-            // art arda patlamasın, tek bir hatırlatma yeterli.
+            // Count the next one from "now": after the Mac wakes from sleep, missed
+            // reminders shouldn't fire back to back; a single one is enough.
             nextReminder = time.addingTimeInterval(interval)
             onReminder()
         }
@@ -75,8 +75,8 @@ final class ReminderSession {
     }
 }
 
-/// Kalan süreyi yukarı yuvarlanmış dakikaya çevirir: 1200 sn → 20, 1199 sn → 20, 30 sn → 1.
-/// Yukarı yuvarlama sayesinde "0 dk" yazıp hâlâ beklemek gibi bir durum olmaz.
+/// Converts seconds left to minutes, rounded up: 1200 s → 20, 1199 s → 20, 30 s → 1.
+/// Rounding up means it never says "0 min" while you're still waiting.
 func minutesLeft(_ seconds: TimeInterval) -> Int {
     max(0, Int((seconds / 60).rounded(.up)))
 }

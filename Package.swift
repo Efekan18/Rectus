@@ -2,9 +2,9 @@
 import PackageDescription
 
 let package = Package(
-    name: "DikDur",
+    name: "Rectus",
     platforms: [.macOS(.v14)],
     targets: [
-        .executableTarget(name: "DikDur")
+        .executableTarget(name: "Rectus")
     ]
 )

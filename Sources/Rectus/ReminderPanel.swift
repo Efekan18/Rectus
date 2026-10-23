@@ -1,14 +1,15 @@
 import AppKit
 import SwiftUI
 
-/// Ekranın üst ortasında birkaç saniye görünüp kaybolan küçük hatırlatma kutusu.
-/// Sistem bildirimi değil, kendi penceremiz: izin istemez, Odak modunda da görünür.
+/// A small reminder box that appears at the top center of the screen for a few seconds.
+/// It's our own window, not a system notification: no permission needed, and it still
+/// shows in Focus mode.
 @MainActor
 final class ReminderPanel {
     static let shared = ReminderPanel()
 
     private var panel: NSPanel?
-    private var generation = 0          // her show() bir artırır; eski gizleme işleri yenisini kapatmasın
+    private var generation = 0          // bumped on every show(), so an old hide timer can't close a newer box
     private let visibleSeconds = 5.0
 
     func show(title: String, message: String, playSound: Bool) {
@@ -25,7 +26,7 @@ final class ReminderPanel {
         moveToTopCenter(panel)
 
         panel.alphaValue = 0
-        panel.orderFrontRegardless()     // uygulamayı öne getirmeden göster, yazdığın yerden odağı çalmaz
+        panel.orderFrontRegardless()     // show without activating the app, so it doesn't steal focus from where you're typing
         NSAnimationContext.runAnimationGroup { context in
             context.duration = 0.25
             panel.animator().alphaValue = 1
@@ -65,10 +66,10 @@ final class ReminderPanel {
             backing: .buffered,
             defer: false
         )
-        panel.level = .statusBar                     // normal pencerelerin üstünde
+        panel.level = .statusBar                     // above normal windows
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
         panel.isOpaque = false
-        panel.backgroundColor = .clear               // köşeleri SwiftUI tarafı yuvarlıyor
+        panel.backgroundColor = .clear               // SwiftUI draws the rounded corners
         panel.hasShadow = true
         panel.hidesOnDeactivate = false
         return panel
@@ -76,14 +77,14 @@ final class ReminderPanel {
 
     private func moveToTopCenter(_ panel: NSPanel) {
         guard let screen = NSScreen.main else { return }
-        let area = screen.visibleFrame                // menü çubuğu ve Dock hariç alan
+        let area = screen.visibleFrame                // screen area minus menu bar and Dock
         let size = panel.frame.size
         panel.setFrameOrigin(NSPoint(x: area.midX - size.width / 2,
                                      y: area.maxY - size.height - 12))
     }
 }
 
-/// Kutunun içi.
+/// The contents of the box.
 private struct ReminderView: View {
     let title: String
     let message: String
@@ -102,15 +103,15 @@ private struct ReminderView: View {
         .padding(.horizontal, 22)
         .padding(.vertical, 14)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
-        .onTapGesture(perform: onTap)                 // tıklayınca hemen kapanır
+        .onTapGesture(perform: onTap)                 // click to dismiss early
     }
 }
 
-/// Her hatırlatmada biri rastgele seçilir; hep aynı cümle bir süre sonra görülmez olur.
+/// One is picked at random each time; the same sentence every time soon goes unnoticed.
 let postureTips = [
-    "Omuzlar geride, göğüs açık.",
-    "Ekran göz hizasında mı?",
-    "Sırtını sandalyeye yasla.",
-    "Ayaklar yere bassın.",
-    "Başını öne uzatma, çeneni hafif geri al.",
+    "Shoulders back, chest open.",
+    "Is your screen at eye level?",
+    "Lean back against your chair.",
+    "Keep both feet on the floor.",
+    "Don't push your head forward; tuck your chin slightly.",
 ]

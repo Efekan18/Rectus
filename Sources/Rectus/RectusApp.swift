@@ -1,27 +1,27 @@
 import SwiftUI
 
-// Not: @State kullanılmıyor. macOS 27 SDK'sında @State bir macro ve onu açan eklenti
-// yalnızca Xcode ile geliyor; Command Line Tools ile derlenmiyor. Kalıcı ayarlar
-// @AppStorage'da, değişen oturum durumu @Observable ReminderSession'da.
+// Note: no @State here. In the macOS 27 SDK @State is a macro whose plugin ships only
+// with Xcode, so it doesn't compile with the Command Line Tools alone. Persistent
+// settings live in @AppStorage, changing session state in the @Observable ReminderSession.
 
 @main
-struct DikDurApp: App {
+struct RectusApp: App {
     private let session = ReminderSession()
 
     init() {
-        // Dock'ta ikon gösterme, sadece menü çubuğunda yaşa.
+        // No Dock icon; live only in the menu bar.
         NSApplication.shared.setActivationPolicy(.accessory)
-        // Ses ayarı hiç seçilmemişse açık say (@AppStorage'daki varsayılanla aynı).
+        // Treat sound as on if it was never set (matches the @AppStorage default).
         UserDefaults.standard.register(defaults: ["soundEnabled": true])
 
         session.onReminder = {
-            ReminderPanel.shared.show(title: "Dik dur",
+            ReminderPanel.shared.show(title: "Sit up straight",
                                       message: postureTips.randomElement()!,
                                       playSound: UserDefaults.standard.bool(forKey: "soundEnabled"))
         }
         session.onFinish = {
-            ReminderPanel.shared.show(title: "Oturum bitti",
-                                      message: "Kalk, biraz esne.",
+            ReminderPanel.shared.show(title: "Session finished",
+                                      message: "Get up and stretch a little.",
                                       playSound: UserDefaults.standard.bool(forKey: "soundEnabled"))
         }
     }
@@ -35,34 +35,34 @@ struct DikDurApp: App {
     }
 }
 
-/// Menü çubuğunda görünen kısım: ikon, oturum açıkken yanında kalan dakika.
-/// Saniye gösterilmiyor: metnin genişliği her saniye değişince ikon kayıyor ve açık
-/// menüyü de kaydırıyordu. Dakika en fazla dakikada bir değişir.
+/// What shows in the menu bar: the icon, plus minutes left while a session is running.
+/// No seconds: when the text width changed every second, the icon shifted and dragged
+/// the open menu with it. Minutes change at most once a minute.
 struct MenuLabel: View {
     let session: ReminderSession
 
     var body: some View {
         Image(systemName: "figure.stand")
         if session.isActive, let left = session.secondsUntilNextReminder {
-            Text("\(minutesLeft(left)) dk")
+            Text("\(minutesLeft(left)) min")
                 .monospacedDigit()
         }
     }
 }
 
-/// İkona tıklayınca açılan menü.
+/// The menu that opens when you click the icon.
 struct MenuContent: View {
     let session: ReminderSession
 
-    // UserDefaults'a yazılır: uygulama kapanıp açılınca son seçim hatırlanır.
+    // Stored in UserDefaults, so the last choice survives a restart.
     @AppStorage("sessionMinutes") private var sessionMinutes = 60
     @AppStorage("intervalMinutes") private var intervalMinutes = 20
     @AppStorage("soundEnabled") private var soundEnabled = true
 
-    private let sessionOptions = [30, 60, 120, 0]   // 0 = durdurana kadar
+    private let sessionOptions = [30, 60, 120, 0]   // 0 = until stopped
     private var intervalOptions: [Int] {
         #if DEBUG
-        [1, 10, 15, 20, 30]                          // 1 dk sadece test için
+        [1, 10, 15, 20, 30]                          // 1 min is for testing only
         #else
         [10, 15, 20, 30]
         #endif
@@ -75,12 +75,12 @@ struct MenuContent: View {
             idleMenu
         }
         Divider()
-        Toggle("Ses", isOn: $soundEnabled)
-        Button("Hatırlatmayı önizle") {
+        Toggle("Sound", isOn: $soundEnabled)
+        Button("Preview Reminder") {
             session.onReminder()
         }
         Divider()
-        Button("Çıkış") {
+        Button("Quit Rectus") {
             NSApplication.shared.terminate(nil)
         }
         .keyboardShortcut("q")
@@ -88,49 +88,50 @@ struct MenuContent: View {
 
     @ViewBuilder
     private var idleMenu: some View {
-        Picker("Süre", selection: $sessionMinutes) {
+        Picker("Duration", selection: $sessionMinutes) {
             ForEach(sessionOptions, id: \.self) { minutes in
                 Text(sessionLabel(minutes)).tag(minutes)
             }
         }
-        Picker("Aralık", selection: $intervalMinutes) {
+        Picker("Interval", selection: $intervalMinutes) {
             ForEach(intervalOptions, id: \.self) { minutes in
-                Text("\(minutes) dk").tag(minutes)
+                Text("Every \(minutes) min").tag(minutes)
             }
         }
-        Button("Başlat") {
+        Button("Start") {
             session.start(sessionMinutes: sessionMinutes, intervalMinutes: intervalMinutes)
         }
     }
 
-    // Menünün içinde geri sayım değil sabit saat var: menü açıkken satırlar her saniye
-    // değişirse macOS menüyü yeniden kuruyor ve fare başka bir satıra kayıyordu.
+    // Fixed clock times instead of a countdown: if rows change every second while the
+    // menu is open, macOS rebuilds it and the pointer lands on a different item.
     @ViewBuilder
     private var activeMenu: some View {
         if let next = session.nextReminder {
-            Text("Sonraki hatırlatma: \(clockTime(next))")
+            Text("Next reminder: \(clockTime(next))")
         }
         if let end = session.endDate {
-            Text("Oturum bitişi: \(clockTime(end))")
+            Text("Session ends: \(clockTime(end))")
         } else {
-            Text("Oturum: durdurana kadar")
+            Text("Session: until stopped")
         }
-        Text("Bu oturumda: \(session.reminderCount) hatırlatma")
-        Button("Durdur") {
+        Text("Reminders so far: \(session.reminderCount)")
+        Button("Stop") {
             session.stop()
         }
     }
 
-    /// 14:35 gibi saat:dakika.
+    /// Hours and minutes, e.g. 14:35 (or 2:35 PM, depending on system settings).
     private func clockTime(_ date: Date) -> String {
         date.formatted(date: .omitted, time: .shortened)
     }
 
     private func sessionLabel(_ minutes: Int) -> String {
         switch minutes {
-        case 0: "Durdurana kadar"
-        case 60...: "\(minutes / 60) saat"
-        default: "\(minutes) dk"
+        case 0: "Until stopped"
+        case 60: "1 hour"
+        case 60...: "\(minutes / 60) hours"
+        default: "\(minutes) min"
         }
     }
 }

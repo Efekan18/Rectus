@@ -3,13 +3,13 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleIdentifier</key>
-	<string>com.efekan18.dikdur</string>
+	<string>com.efekan18.rectus</string>
 	<key>CFBundleName</key>
-	<string>DikDur</string>
+	<string>Rectus</string>
 	<key>CFBundleDisplayName</key>
-	<string>DikDur</string>
+	<string>Rectus</string>
 	<key>CFBundleExecutable</key>
-	<string>DikDur</string>
+	<string>Rectus</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>

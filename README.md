@@ -1,58 +1,64 @@
-# DikDur
+# Rectus
 
-Mac'in menü çubuğunda duran küçük bir dik durma hatırlatıcısı. Bir oturum başlatırsın;
-oturum açık kaldığı sürece seçtiğin aralıklarla ekranın üstünde kısa bir kutu belirir
-("Dik dur — omuzlar geride") ve istersen hafif bir ses çalar.
+A tiny macOS menu bar app that reminds you to sit up straight.
 
-*A tiny macOS menu bar app that reminds you to sit up straight at regular intervals.*
+Start a session from the menu bar; while it runs, a small box appears at the top of your
+screen at the interval you chose ("Sit up straight — shoulders back, chest open"), with an
+optional soft sound.
 
-## Özellikler
+*Rectus* is Latin for "upright, straight". It's also the name of the *rectus abdominis*,
+one of the muscles that holds your posture.
 
-- Menü çubuğunda ikon; oturum açıkken yanında sıradaki hatırlatmaya kalan dakika
-- Oturum süresi: 30 dk, 1 saat, 2 saat ya da durdurana kadar
-- Hatırlatma aralığı: 10, 15, 20, 30 dk
-- Hatırlatma: ekranın üst ortasında 5 sn görünen kutu + isteğe bağlı ses
-- Kutu odağı çalmaz; yazarken klavyen kutuya kaymaz
-- Mac uykudan uyanınca biriken hatırlatmalar art arda gelmez, tek seferde gelir
-- Son seçilen ayarlar hatırlanır
-- Dock'ta görünmez, ~200 KB
+## Features
 
-## Kurulum
+- Lives in the menu bar; while a session runs, the minutes until the next reminder show next to the icon
+- Session length: 30 min, 1 hour, 2 hours, or until stopped
+- Reminder interval: every 10, 15, 20 or 30 min
+- Reminder: a box at the top center of the screen for 5 seconds, plus an optional sound
+- The box never steals focus, so your typing doesn't jump into it
+- After the Mac wakes from sleep, missed reminders don't fire back to back; you get just one
+- Remembers your last settings
+- No Dock icon, ~200 KB
 
-Gereken: macOS 14+, Swift 6 (Xcode ya da yalnızca Command Line Tools: `xcode-select --install`).
+## Install
+
+Requires macOS 14+ and Swift 6 (Xcode, or just the Command Line Tools: `xcode-select --install`).
 
 ```bash
-git clone https://github.com/Efekan18/DikDur.git
-cd DikDur
+git clone https://github.com/Efekan18/Rectus.git
+cd Rectus
 ./build.sh --install
 ```
 
-Uygulama `~/Applications/DikDur.app` olarak kurulur ve açılır.
-Girişte otomatik açılması için: Sistem Ayarları → Genel → Giriş Öğeleri → DikDur'u ekle.
+The app is installed as `~/Applications/Rectus.app` and launched.
+To start it at login: System Settings → General → Login Items → add Rectus.
 
-Geliştirirken `swift run` ile doğrudan çalıştırılabilir; debug sürümde test için 1 dk aralık
-seçeneği de vardır.
+During development you can run it directly with `swift run`; the debug build also offers a
+1-minute interval for testing.
 
-## Neden sistem bildirimi değil?
+## Why not system notifications?
 
-Ücretli Apple Developer imzası olmayan (ad-hoc imzalı) uygulamalara macOS bildirim izni
-vermiyor. Kendi kutumuz izin gerektirmiyor ve Odak modunda da görünüyor. Dik durma
-hatırlatıcısı için istenen davranış da bu.
+macOS doesn't grant notification permission to ad-hoc signed apps (apps without a paid
+Apple Developer signature). Our own box needs no permission and still shows in Focus mode,
+which is what you want from a posture reminder anyway.
 
-## Yapı
+## Structure
 
-| Dosya | Görevi |
+| File | Purpose |
 | --- | --- |
-| `Sources/DikDur/DikDurApp.swift` | Giriş noktası, menü çubuğu ikonu ve menü |
-| `Sources/DikDur/ReminderSession.swift` | Zamanlama: oturum bitişi, sıradaki hatırlatma |
-| `Sources/DikDur/ReminderPanel.swift` | Ekranda beliren kutu + ses |
-| `Resources/Info.plist` | Uygulama kimliği; `LSUIElement` ile Dock'ta görünmez |
-| `build.sh` | Derle → `.app` paketle → imzala → kur |
+| `Sources/Rectus/RectusApp.swift` | Entry point, menu bar icon and menu |
+| `Sources/Rectus/ReminderSession.swift` | Timing: session end, next reminder |
+| `Sources/Rectus/ReminderPanel.swift` | The on-screen box + sound |
+| `Resources/Info.plist` | App identity; `LSUIElement` keeps it out of the Dock |
+| `build.sh` | Build → package `.app` → sign → install |
 
-## Nasıl yapıldı
+## How it was made
 
-Kodu [Claude Code](https://claude.com/claude-code) yazdı. Fikir, ihtiyacın tanımı, yaklaşım
-seçimi, test ve günlük kullanım bana ait. Bulduğum bir hata da bu sürece dahil: açık menü
-saniyede bir kayıyordu. Her adımın nedeni commit geçmişinde yazılı.
+The code was written by [Claude Code](https://claude.com/claude-code). The idea,
+requirements, choice of approach, testing and daily use are mine, including a bug I found
+in use: the open menu shifted every second. The reasoning behind each step is in the
+commit history.
 
-*Code written by Claude Code; idea, requirements, testing and decisions by me.*
+## License
+
+[MIT](LICENSE)
