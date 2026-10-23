@@ -1,24 +1,39 @@
+<img src="Resources/AppIcon-preview.png" width="128" alt="Rectus icon">
+
 # Rectus
 
 A tiny macOS menu bar app that reminds you to sit up straight.
 
-Start a session from the menu bar; while it runs, a small box appears at the top of your
-screen at the interval you chose ("Sit up straight — shoulders back, chest open"), with an
-optional soft sound.
+Start reminders from the menu bar; while they're on, a small box appears at the top of
+your screen at the interval you chose ("Sit up straight — shoulders back, chest open"),
+with an optional soft sound. Sit up, then click **I'm upright**: that one deliberate click
+is the point. A reminder you have to answer is harder to ignore than one that just
+passes by.
 
 *Rectus* is Latin for "upright, straight". It's also the name of the *rectus abdominis*,
 one of the muscles that holds your posture.
 
 ## Features
 
-- Lives in the menu bar; while a session runs, the minutes until the next reminder show next to the icon
-- Session length: 30 min, 1 hour, 2 hours, or until stopped
-- Reminder interval: every 10, 15, 20 or 30 min
-- Reminder: a box at the top center of the screen for 5 seconds, plus an optional sound
+- Lives in the menu bar: a seated figure while reminders are off, a standing one while they're on
+- Duration: 1, 2 or 3 hours, or until stopped
+- Interval: every 15, 20, 30 or 45 min, or **varied** (random, 15–30 min)
+- Reminder: a box at the top center of the screen for 8 seconds with an **I'm upright** button, plus an optional sound
+- Daily tally in the menu: "Today: 5 of 7 confirmed"
+- Knows when you're away: sleep, screen lock or screen saver stops the reminders;
+  if there's been no keyboard or mouse input for 5 minutes, that reminder is skipped
 - The box never steals focus, so your typing doesn't jump into it
-- After the Mac wakes from sleep, missed reminders don't fire back to back; you get just one
-- Remembers your last settings
-- No Dock icon, ~200 KB
+- Remembers your last settings; no Dock icon
+
+## Why these intervals?
+
+There's no proven "right" interval. A [Cochrane review](https://www.cochrane.org/evidence/CD012886_work-break-schedules-preventing-musculoskeletal-symptoms-and-disorders-healthy-workers)
+found no clear difference between break schedules (low-quality evidence). The practical
+anchor is Cornell's [20-8-2 guideline](https://ergo.human.cornell.edu/CUESitStandPrograms.html),
+which suggests changing posture roughly every 20–30 minutes, so the default is 20 min.
+Intervals shorter than 15 min were dropped: reminders that come too often get tuned out.
+Varied mode exists for the same reason: an unpredictable reminder is harder to ignore than
+one that comes like clockwork.
 
 ## Install
 
@@ -47,16 +62,20 @@ which is what you want from a posture reminder anyway.
 | File | Purpose |
 | --- | --- |
 | `Sources/Rectus/RectusApp.swift` | Entry point, menu bar icon and menu |
-| `Sources/Rectus/ReminderSession.swift` | Timing: session end, next reminder |
-| `Sources/Rectus/ReminderPanel.swift` | The on-screen box + sound |
+| `Sources/Rectus/ReminderSession.swift` | Timing: session end, next reminder, idle skip |
+| `Sources/Rectus/ReminderPanel.swift` | The on-screen box, its button and the sound |
+| `Sources/Rectus/AwayDetector.swift` | Sleep / lock / screen saver events, idle time |
+| `Sources/Rectus/DailyStats.swift` | Today's shown / confirmed counts |
 | `Resources/Info.plist` | App identity; `LSUIElement` keeps it out of the Dock |
+| `scripts/make-icon.swift` | Draws the app icon → `Resources/AppIcon.icns` |
 | `build.sh` | Build → package `.app` → sign → install |
 
 ## How it was made
 
 The code was written by [Claude Code](https://claude.com/claude-code). The idea,
 requirements, choice of approach, testing and daily use are mine, including a bug I found
-in use: the open menu shifted every second. The reasoning behind each step is in the
+in use (the open menu shifted every second) and the v2 ideas: stopping when away, the
+"I'm upright" check and dropping the countdowns from the menu. The reasoning behind each step is in the
 commit history.
 
 ## License
