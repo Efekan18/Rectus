@@ -7,9 +7,6 @@ import Observation
 final class ReminderSession {
     /// intervalMinutes value meaning "a random interval between 15 and 30 minutes".
     nonisolated static let variedInterval = 0
-    /// Reminders are skipped if there has been no keyboard or mouse input for this long:
-    /// you're probably not at the desk.
-    static let idleThreshold: TimeInterval = 5 * 60
 
     private(set) var isActive = false
     private(set) var endDate: Date?          // nil = until stopped
@@ -22,8 +19,9 @@ final class ReminderSession {
     var onReminder: () -> Void = {}
     /// Called when the session time runs out.
     var onFinish: () -> Void = {}
-    /// Seconds since the last user input. Replaceable so tests can fake it.
-    var idleSeconds: () -> TimeInterval = { 0 }
+    /// When this returns true the reminder is skipped silently (e.g. display off or locked:
+    /// no box and no sound into an empty room). Replaceable so tests can fake it.
+    var shouldSkip: () -> Bool = { false }
 
     /// sessionMinutes 0 = until stopped; intervalMinutes 0 = varied (15–30 min).
     func start(sessionMinutes: Int, intervalMinutes: Int, at start: Date = Date()) {
@@ -63,7 +61,7 @@ final class ReminderSession {
             // Schedule the next one from "now", not from the old plan, so reminders
             // can never pile up and fire back to back.
             nextReminder = time.addingTimeInterval(nextInterval())
-            if idleSeconds() < Self.idleThreshold {
+            if !shouldSkip() {
                 onReminder()
             }
         }

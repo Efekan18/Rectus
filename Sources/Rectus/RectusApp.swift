@@ -8,6 +8,7 @@ import SwiftUI
 struct RectusApp: App {
     private let session = ReminderSession()
     private let stats = DailyStats()
+    private let away: AwayDetector
 
     init() {
         // No Dock icon; live only in the menu bar.
@@ -17,7 +18,11 @@ struct RectusApp: App {
         Options.resetInvalidSettings()
 
         let session = session, stats = stats
-        session.idleSeconds = AwayDetector.idleSeconds
+        // The Mac going to sleep ends the session; while the display is off or locked,
+        // reminders are skipped but the session keeps running.
+        let away = AwayDetector(onSleep: { session.stop() })
+        self.away = away
+        session.shouldSkip = { away.screenUnavailable }
         session.onReminder = {
             stats.recordShown()
             showReminder(onCheck: { stats.recordChecked() })
@@ -27,17 +32,14 @@ struct RectusApp: App {
                                       message: "Get up and stretch a little.",
                                       playSound: soundEnabled)
         }
-        // Away from the desk (sleep, lock, screen saver): end the session instead of
-        // counting down for nobody.
-        AwayDetector.watch { session.stop() }
     }
 
     var body: some Scene {
         MenuBarExtra {
             MenuContent(session: session, stats: stats)
         } label: {
-            // Standing figure while reminders are on, seated figure while they're off.
-            Image(systemName: session.isActive ? "figure.stand" : "figure.seated.side.left")
+            // Same standing figure; faded while reminders are off, like a disabled item.
+            Image(nsImage: session.isActive ? MenuBarIcon.on : MenuBarIcon.off)
         }
     }
 }
@@ -51,6 +53,26 @@ private func showReminder(onCheck: @escaping () -> Void) {
                               message: postureTips.randomElement()!,
                               playSound: soundEnabled,
                               onCheck: onCheck)
+}
+
+/// The menu bar figure. A template image: macOS tints it to match the menu bar
+/// (black or white) but keeps its transparency, so the faded version stays faded.
+@MainActor
+enum MenuBarIcon {
+    static let on = make(opacity: 1)
+    static let off = make(opacity: 0.35)
+
+    private static func make(opacity: CGFloat) -> NSImage {
+        let config = NSImage.SymbolConfiguration(pointSize: 15, weight: .regular)
+        let figure = NSImage(systemSymbolName: "figure.stand", accessibilityDescription: "Rectus")!
+            .withSymbolConfiguration(config)!
+        let image = NSImage(size: figure.size, flipped: false) { rect in
+            figure.draw(in: rect, from: .zero, operation: .sourceOver, fraction: opacity)
+            return true
+        }
+        image.isTemplate = true
+        return image
+    }
 }
 
 /// The choices offered in the menu.

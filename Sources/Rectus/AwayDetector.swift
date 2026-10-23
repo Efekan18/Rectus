@@ -1,33 +1,30 @@
 import AppKit
-import CoreGraphics
 
-/// Notices when you leave the desk: the Mac sleeps, the display sleeps, the screen locks,
-/// or the screen saver starts. Reminders only make sense while you're sitting there.
+/// Notices when the Mac stops being used: it goes to sleep, or the display is off or
+/// locked. Reading or watching a video without touching the keyboard is NOT "away":
+/// there's deliberately no idle-time check.
 @MainActor
-enum AwayDetector {
-    static func watch(onAway: @escaping @MainActor () -> Void) {
-        let workspace = NSWorkspace.shared.notificationCenter
-        for name in [NSWorkspace.willSleepNotification,
-                     NSWorkspace.screensDidSleepNotification,
-                     NSWorkspace.sessionDidResignActiveNotification] {   // switched user
-            Task {
-                for await _ in workspace.notifications(named: name) { onAway() }
-            }
-        }
+final class AwayDetector {
+    /// True while the display is asleep or the screen is locked.
+    private(set) var screenUnavailable = false
 
-        // Screen lock and screen saver are only announced as system-wide "distributed"
-        // notifications, under these string names.
+    /// `onSleep` runs when the Mac itself goes to sleep (lid closed, Apple menu → Sleep).
+    init(onSleep: @escaping @MainActor () -> Void) {
+        let workspace = NSWorkspace.shared.notificationCenter
+        listen(workspace, NSWorkspace.willSleepNotification) { onSleep() }
+        listen(workspace, NSWorkspace.screensDidSleepNotification) { [weak self] in self?.screenUnavailable = true }
+        listen(workspace, NSWorkspace.screensDidWakeNotification) { [weak self] in self?.screenUnavailable = false }
+
+        // Lock and unlock are only announced as system-wide "distributed" notifications.
         let distributed = DistributedNotificationCenter.default()
-        for name in ["com.apple.screenIsLocked", "com.apple.screensaver.didstart"] {
-            Task {
-                for await _ in distributed.notifications(named: Notification.Name(name)) { onAway() }
-            }
-        }
+        listen(distributed, Notification.Name("com.apple.screenIsLocked")) { [weak self] in self?.screenUnavailable = true }
+        listen(distributed, Notification.Name("com.apple.screenIsUnlocked")) { [weak self] in self?.screenUnavailable = false }
     }
 
-    /// Seconds since the last keyboard or mouse input, from anywhere in the system.
-    static func idleSeconds() -> TimeInterval {
-        let anyInput = CGEventType(rawValue: ~0)!   // kCGAnyInputEventType
-        return CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: anyInput)
+    private func listen(_ center: NotificationCenter, _ name: Notification.Name,
+                        _ handler: @escaping @MainActor () -> Void) {
+        Task {
+            for await _ in center.notifications(named: name) { handler() }
+        }
     }
 }
