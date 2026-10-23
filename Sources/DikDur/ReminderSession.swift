@@ -75,9 +75,8 @@ final class ReminderSession {
     }
 }
 
-/// 75 → "1:15", 3725 → "1:02:05"
-func formatCountdown(_ seconds: TimeInterval) -> String {
-    let total = max(0, Int(seconds.rounded(.up)))
-    let h = total / 3600, m = (total % 3600) / 60, s = total % 60
-    return h > 0 ? String(format: "%d:%02d:%02d", h, m, s) : String(format: "%d:%02d", m, s)
+/// Kalan süreyi yukarı yuvarlanmış dakikaya çevirir: 1200 sn → 20, 1199 sn → 20, 30 sn → 1.
+/// Yukarı yuvarlama sayesinde "0 dk" yazıp hâlâ beklemek gibi bir durum olmaz.
+func minutesLeft(_ seconds: TimeInterval) -> Int {
+    max(0, Int((seconds / 60).rounded(.up)))
 }

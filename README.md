@@ -8,7 +8,7 @@ oturum açık kaldığı sürece seçtiğin aralıklarla ekranın üstünde kıs
 
 ## Özellikler
 
-- Menü çubuğunda ikon; oturum açıkken yanında sıradaki hatırlatmaya geri sayım
+- Menü çubuğunda ikon; oturum açıkken yanında sıradaki hatırlatmaya kalan dakika
 - Oturum süresi: 30 dk, 1 saat, 2 saat ya da durdurana kadar
 - Hatırlatma aralığı: 10, 15, 20, 30 dk
 - Hatırlatma: ekranın üst ortasında 5 sn görünen kutu + isteğe bağlı ses

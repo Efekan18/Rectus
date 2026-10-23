@@ -35,14 +35,17 @@ struct DikDurApp: App {
     }
 }
 
-/// Menü çubuğunda görünen kısım: ikon, oturum açıkken yanında geri sayım.
+/// Menü çubuğunda görünen kısım: ikon, oturum açıkken yanında kalan dakika.
+/// Saniye gösterilmiyor: metnin genişliği her saniye değişince ikon kayıyor ve açık
+/// menüyü de kaydırıyordu. Dakika en fazla dakikada bir değişir.
 struct MenuLabel: View {
     let session: ReminderSession
 
     var body: some View {
         Image(systemName: "figure.stand")
         if session.isActive, let left = session.secondsUntilNextReminder {
-            Text(formatCountdown(left))
+            Text("\(minutesLeft(left)) dk")
+                .monospacedDigit()
         }
     }
 }
@@ -100,13 +103,15 @@ struct MenuContent: View {
         }
     }
 
+    // Menünün içinde geri sayım değil sabit saat var: menü açıkken satırlar her saniye
+    // değişirse macOS menüyü yeniden kuruyor ve fare başka bir satıra kayıyordu.
     @ViewBuilder
     private var activeMenu: some View {
-        if let left = session.secondsUntilNextReminder {
-            Text("Sonraki hatırlatma: \(formatCountdown(left))")
+        if let next = session.nextReminder {
+            Text("Sonraki hatırlatma: \(clockTime(next))")
         }
-        if let left = session.secondsUntilEnd {
-            Text("Oturumun bitmesine: \(formatCountdown(left))")
+        if let end = session.endDate {
+            Text("Oturum bitişi: \(clockTime(end))")
         } else {
             Text("Oturum: durdurana kadar")
         }
@@ -114,6 +119,11 @@ struct MenuContent: View {
         Button("Durdur") {
             session.stop()
         }
+    }
+
+    /// 14:35 gibi saat:dakika.
+    private func clockTime(_ date: Date) -> String {
+        date.formatted(date: .omitted, time: .shortened)
     }
 
     private func sessionLabel(_ minutes: Int) -> String {
