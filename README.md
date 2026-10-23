@@ -15,13 +15,14 @@ one of the muscles that holds your posture.
 
 ## Features
 
-- Lives in the menu bar: a seated figure while reminders are off, a standing one while they're on
+- Lives in the menu bar: the standing figure is faded while reminders are off, solid while they're on
 - Duration: 1, 2 or 3 hours, or until stopped
 - Interval: every 15, 20, 30 or 45 min, or **varied** (random, 15–30 min)
 - Reminder: a box at the top center of the screen for 8 seconds with an **I'm upright** button, plus an optional sound
 - Daily tally in the menu: "Today: 5 of 7 confirmed"
-- Knows when you're away: sleep, screen lock or screen saver stops the reminders;
-  if there's been no keyboard or mouse input for 5 minutes, that reminder is skipped
+- Sleep-aware: when the Mac goes to sleep the reminders stop; while the display is off
+  or locked, reminders are skipped silently. Reading or watching a video without touching
+  the keyboard doesn't count as away
 - The box never steals focus, so your typing doesn't jump into it
 - Remembers your last settings; no Dock icon
 
@@ -62,19 +63,19 @@ which is what you want from a posture reminder anyway.
 | File | Purpose |
 | --- | --- |
 | `Sources/Rectus/RectusApp.swift` | Entry point, menu bar icon and menu |
-| `Sources/Rectus/ReminderSession.swift` | Timing: session end, next reminder, idle skip |
+| `Sources/Rectus/ReminderSession.swift` | Timing: session end, next reminder, skipping |
 | `Sources/Rectus/ReminderPanel.swift` | The on-screen box, its button and the sound |
-| `Sources/Rectus/AwayDetector.swift` | Sleep / lock / screen saver events, idle time |
+| `Sources/Rectus/AwayDetector.swift` | Sleep, display sleep and screen lock events |
 | `Sources/Rectus/DailyStats.swift` | Today's shown / confirmed counts |
 | `Resources/Info.plist` | App identity; `LSUIElement` keeps it out of the Dock |
-| `scripts/make-icon.swift` | Draws the app icon → `Resources/AppIcon.icns` |
+| `scripts/make-icon.swift` | Draws the app icon (a straight spine) → `Resources/AppIcon.icns` |
 | `build.sh` | Build → package `.app` → sign → install |
 
 ## How it was made
 
 The code was written by [Claude Code](https://claude.com/claude-code). The idea,
 requirements, choice of approach, testing and daily use are mine, including a bug I found
-in use (the open menu shifted every second) and the v2 ideas: stopping when away, the
+in use (the open menu shifted every second) and the v2 ideas: stopping on sleep, the
 "I'm upright" check and dropping the countdowns from the menu. The reasoning behind each step is in the
 commit history.
 
