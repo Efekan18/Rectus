@@ -11,6 +11,19 @@ struct DikDurApp: App {
     init() {
         // Dock'ta ikon gösterme, sadece menü çubuğunda yaşa.
         NSApplication.shared.setActivationPolicy(.accessory)
+        // Ses ayarı hiç seçilmemişse açık say (@AppStorage'daki varsayılanla aynı).
+        UserDefaults.standard.register(defaults: ["soundEnabled": true])
+
+        session.onReminder = {
+            ReminderPanel.shared.show(title: "Dik dur",
+                                      message: postureTips.randomElement()!,
+                                      playSound: UserDefaults.standard.bool(forKey: "soundEnabled"))
+        }
+        session.onFinish = {
+            ReminderPanel.shared.show(title: "Oturum bitti",
+                                      message: "Kalk, biraz esne.",
+                                      playSound: UserDefaults.standard.bool(forKey: "soundEnabled"))
+        }
     }
 
     var body: some Scene {
@@ -41,6 +54,7 @@ struct MenuContent: View {
     // UserDefaults'a yazılır: uygulama kapanıp açılınca son seçim hatırlanır.
     @AppStorage("sessionMinutes") private var sessionMinutes = 60
     @AppStorage("intervalMinutes") private var intervalMinutes = 20
+    @AppStorage("soundEnabled") private var soundEnabled = true
 
     private let sessionOptions = [30, 60, 120, 0]   // 0 = durdurana kadar
     private var intervalOptions: [Int] {
@@ -56,6 +70,11 @@ struct MenuContent: View {
             activeMenu
         } else {
             idleMenu
+        }
+        Divider()
+        Toggle("Ses", isOn: $soundEnabled)
+        Button("Hatırlatmayı önizle") {
+            session.onReminder()
         }
         Divider()
         Button("Çıkış") {
