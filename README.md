@@ -49,7 +49,10 @@ hatırlatıcısı için istenen davranış da bu.
 | `Resources/Info.plist` | Uygulama kimliği; `LSUIElement` ile Dock'ta görünmez |
 | `build.sh` | Derle → `.app` paketle → imzala → kur |
 
-## Yapım notu
+## Nasıl yapıldı
 
-Bu proje [Claude Code](https://claude.com/claude-code) yardımıyla geliştirildi. Tasarım
-kararları, test ve kullanım benim; kodun her parçası açıklamalarıyla birlikte incelendi.
+Kodu [Claude Code](https://claude.com/claude-code) yazdı. Fikir, ihtiyacın tanımı, yaklaşım
+seçimi, test ve günlük kullanım bana ait. Bulduğum bir hata da bu sürece dahil: açık menü
+saniyede bir kayıyordu. Her adımın nedeni commit geçmişinde yazılı.
+
+*Code written by Claude Code; idea, requirements, testing and decisions by me.*
