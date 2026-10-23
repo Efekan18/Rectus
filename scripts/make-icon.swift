@@ -1,4 +1,4 @@
-// Draws the app icon and writes Resources/AppIcon.icns.
+// Draws the app icon (a perfectly straight spine) and writes Resources/AppIcon.icns.
 // Run from the repo root:  swift scripts/make-icon.swift
 import AppKit
 
@@ -21,25 +21,66 @@ func drawIcon() -> NSImage {
         shape.fill()
         NSGraphicsContext.restoreGraphicsState()
 
-        // Teal-to-blue gradient tile.
-        let gradient = NSGradient(colors: [
-            NSColor(red: 0.16, green: 0.78, blue: 0.70, alpha: 1),
-            NSColor(red: 0.12, green: 0.40, blue: 0.85, alpha: 1),
+        // Deep indigo-to-teal tile.
+        let tile = NSGradient(colors: [
+            NSColor(red: 0.17, green: 0.20, blue: 0.48, alpha: 1),
+            NSColor(red: 0.04, green: 0.50, blue: 0.52, alpha: 1),
         ])!
-        gradient.draw(in: shape, angle: -90)
+        tile.draw(in: shape, angle: -90)
 
-        // A thin vertical "spine" line behind the figure: the upright axis.
-        NSColor.white.withAlphaComponent(0.18).setFill()
-        NSBezierPath(roundedRect: NSRect(x: 502, y: 190, width: 20, height: 644), xRadius: 10, yRadius: 10).fill()
+        // A soft glow behind the spine so it reads as lit from within.
+        NSGraphicsContext.saveGraphicsState()
+        shape.addClip()
+        NSGradient(colors: [NSColor.white.withAlphaComponent(0.20), NSColor.white.withAlphaComponent(0)])!
+            .draw(fromCenter: NSPoint(x: 512, y: 512), radius: 0,
+                  toCenter: NSPoint(x: 512, y: 512), radius: 380, options: [])
+        NSGraphicsContext.restoreGraphicsState()
 
-        // The standing figure, white.
-        let config = NSImage.SymbolConfiguration(pointSize: 520, weight: .semibold)
-            .applying(.init(paletteColors: [.white]))
-        if let figure = NSImage(systemSymbolName: "figure.stand", accessibilityDescription: nil)?
-            .withSymbolConfiguration(config) {
-            let size = figure.size
-            figure.draw(in: NSRect(x: (canvas - size.width) / 2, y: (canvas - size.height) / 2,
-                                   width: size.width, height: size.height))
+        // The spine: vertebrae stacked in a perfectly straight column, wider at the
+        // bottom like a real spine. Each vertebra is a body with two side wings
+        // (the transverse processes), which is what makes it read as a spine.
+        let count = 7
+        let gap: CGFloat = 16
+        var y: CGFloat = 196
+        for i in 0..<count {
+            let t = CGFloat(i) / CGFloat(count - 1)          // 0 at the bottom, 1 at the top
+            let bodyWidth = 190 - 70 * t
+            let height = 72 - 18 * t
+            let wingWidth = bodyWidth * 1.75
+            let wingHeight = height * 0.38
+
+            let body = NSBezierPath(roundedRect: NSRect(x: (canvas - bodyWidth) / 2, y: y, width: bodyWidth, height: height),
+                                    xRadius: height * 0.45, yRadius: height * 0.45)
+            let wings = NSBezierPath(roundedRect: NSRect(x: (canvas - wingWidth) / 2, y: y + height * 0.40,
+                                                         width: wingWidth, height: wingHeight),
+                                     xRadius: wingHeight / 2, yRadius: wingHeight / 2)
+            let vertebra = NSBezierPath()
+            vertebra.append(wings)
+            vertebra.append(body)
+            vertebra.windingRule = .nonZero
+
+            NSGraphicsContext.saveGraphicsState()
+            let shadow = NSShadow()
+            shadow.shadowColor = NSColor.black.withAlphaComponent(0.32)
+            shadow.shadowOffset = NSSize(width: 0, height: -6)
+            shadow.shadowBlurRadius = 12
+            shadow.set()
+            NSColor.white.setFill()
+            vertebra.fill()
+            NSGraphicsContext.restoreGraphicsState()
+
+            // Light from above: white on top, a cool tint underneath.
+            NSGradient(colors: [NSColor(red: 0.78, green: 0.92, blue: 0.94, alpha: 1), .white])!
+                .draw(in: vertebra, angle: 90)
+
+            y += height
+            if i < count - 1 {
+                let discWidth = bodyWidth * 0.7
+                let disc = NSRect(x: (canvas - discWidth) / 2, y: y + gap * 0.22, width: discWidth, height: gap * 0.56)
+                NSColor(red: 0.50, green: 0.93, blue: 0.85, alpha: 0.9).setFill()
+                NSBezierPath(roundedRect: disc, xRadius: gap * 0.28, yRadius: gap * 0.28).fill()
+                y += gap
+            }
         }
         return true
     }
