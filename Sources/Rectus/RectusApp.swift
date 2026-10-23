@@ -2,50 +2,77 @@ import SwiftUI
 
 // Note: no @State here. In the macOS 27 SDK @State is a macro whose plugin ships only
 // with Xcode, so it doesn't compile with the Command Line Tools alone. Persistent
-// settings live in @AppStorage, changing session state in the @Observable ReminderSession.
+// settings live in @AppStorage, changing state in @Observable classes.
 
 @main
 struct RectusApp: App {
     private let session = ReminderSession()
+    private let stats = DailyStats()
 
     init() {
         // No Dock icon; live only in the menu bar.
         NSApplication.shared.setActivationPolicy(.accessory)
         // Treat sound as on if it was never set (matches the @AppStorage default).
         UserDefaults.standard.register(defaults: ["soundEnabled": true])
+        Options.resetInvalidSettings()
 
+        let session = session, stats = stats
+        session.idleSeconds = AwayDetector.idleSeconds
         session.onReminder = {
-            ReminderPanel.shared.show(title: "Sit up straight",
-                                      message: postureTips.randomElement()!,
-                                      playSound: UserDefaults.standard.bool(forKey: "soundEnabled"))
+            stats.recordShown()
+            showReminder(onCheck: { stats.recordChecked() })
         }
         session.onFinish = {
             ReminderPanel.shared.show(title: "Session finished",
                                       message: "Get up and stretch a little.",
-                                      playSound: UserDefaults.standard.bool(forKey: "soundEnabled"))
+                                      playSound: soundEnabled)
         }
+        // Away from the desk (sleep, lock, screen saver): end the session instead of
+        // counting down for nobody.
+        AwayDetector.watch { session.stop() }
     }
 
     var body: some Scene {
         MenuBarExtra {
-            MenuContent(session: session)
+            MenuContent(session: session, stats: stats)
         } label: {
-            MenuLabel(session: session)
+            // Standing figure while reminders are on, seated figure while they're off.
+            Image(systemName: session.isActive ? "figure.stand" : "figure.seated.side.left")
         }
     }
 }
 
-/// What shows in the menu bar: the icon, plus minutes left while a session is running.
-/// No seconds: when the text width changed every second, the icon shifted and dragged
-/// the open menu with it. Minutes change at most once a minute.
-struct MenuLabel: View {
-    let session: ReminderSession
+@MainActor
+private var soundEnabled: Bool { UserDefaults.standard.bool(forKey: "soundEnabled") }
 
-    var body: some View {
-        Image(systemName: "figure.stand")
-        if session.isActive, let left = session.secondsUntilNextReminder {
-            Text("\(minutesLeft(left)) min")
-                .monospacedDigit()
+@MainActor
+private func showReminder(onCheck: @escaping () -> Void) {
+    ReminderPanel.shared.show(title: "Sit up straight",
+                              message: postureTips.randomElement()!,
+                              playSound: soundEnabled,
+                              onCheck: onCheck)
+}
+
+/// The choices offered in the menu.
+enum Options {
+    static let sessionMinutes = [60, 120, 180, 0]        // 0 = until stopped
+    static let intervalMinutes: [Int] = {
+        #if DEBUG
+        [1, 15, 20, 30, 45, ReminderSession.variedInterval]   // 1 min is for testing only
+        #else
+        [15, 20, 30, 45, ReminderSession.variedInterval]
+        #endif
+    }()
+
+    /// A value saved by an older version (e.g. a 10-minute interval) may no longer be on
+    /// the menu; fall back to the default instead of starting with an invisible choice.
+    static func resetInvalidSettings() {
+        let defaults = UserDefaults.standard
+        if let saved = defaults.object(forKey: "sessionMinutes") as? Int, !sessionMinutes.contains(saved) {
+            defaults.removeObject(forKey: "sessionMinutes")
+        }
+        if let saved = defaults.object(forKey: "intervalMinutes") as? Int, !intervalMinutes.contains(saved) {
+            defaults.removeObject(forKey: "intervalMinutes")
         }
     }
 }
@@ -53,31 +80,30 @@ struct MenuLabel: View {
 /// The menu that opens when you click the icon.
 struct MenuContent: View {
     let session: ReminderSession
+    let stats: DailyStats
 
     // Stored in UserDefaults, so the last choice survives a restart.
-    @AppStorage("sessionMinutes") private var sessionMinutes = 60
+    @AppStorage("sessionMinutes") private var sessionMinutes = 0
     @AppStorage("intervalMinutes") private var intervalMinutes = 20
     @AppStorage("soundEnabled") private var soundEnabled = true
 
-    private let sessionOptions = [30, 60, 120, 0]   // 0 = until stopped
-    private var intervalOptions: [Int] {
-        #if DEBUG
-        [1, 10, 15, 20, 30]                          // 1 min is for testing only
-        #else
-        [10, 15, 20, 30]
-        #endif
-    }
-
     var body: some View {
         if session.isActive {
-            activeMenu
+            Text("Reminders on")
+            Button("Stop") {
+                session.stop()
+            }
         } else {
             idleMenu
+        }
+        if stats.shown > 0 {
+            Divider()
+            Text("Today: \(stats.checked) of \(stats.shown) confirmed")
         }
         Divider()
         Toggle("Sound", isOn: $soundEnabled)
         Button("Preview Reminder") {
-            session.onReminder()
+            showReminder(onCheck: {})                // a preview doesn't count
         }
         Divider()
         Button("Quit Rectus") {
@@ -89,13 +115,13 @@ struct MenuContent: View {
     @ViewBuilder
     private var idleMenu: some View {
         Picker("Duration", selection: $sessionMinutes) {
-            ForEach(sessionOptions, id: \.self) { minutes in
+            ForEach(Options.sessionMinutes, id: \.self) { minutes in
                 Text(sessionLabel(minutes)).tag(minutes)
             }
         }
         Picker("Interval", selection: $intervalMinutes) {
-            ForEach(intervalOptions, id: \.self) { minutes in
-                Text("Every \(minutes) min").tag(minutes)
+            ForEach(Options.intervalMinutes, id: \.self) { minutes in
+                Text(intervalLabel(minutes)).tag(minutes)
             }
         }
         Button("Start") {
@@ -103,35 +129,15 @@ struct MenuContent: View {
         }
     }
 
-    // Fixed clock times instead of a countdown: if rows change every second while the
-    // menu is open, macOS rebuilds it and the pointer lands on a different item.
-    @ViewBuilder
-    private var activeMenu: some View {
-        if let next = session.nextReminder {
-            Text("Next reminder: \(clockTime(next))")
-        }
-        if let end = session.endDate {
-            Text("Session ends: \(clockTime(end))")
-        } else {
-            Text("Session: until stopped")
-        }
-        Text("Reminders so far: \(session.reminderCount)")
-        Button("Stop") {
-            session.stop()
-        }
-    }
-
-    /// Hours and minutes, e.g. 14:35 (or 2:35 PM, depending on system settings).
-    private func clockTime(_ date: Date) -> String {
-        date.formatted(date: .omitted, time: .shortened)
-    }
-
     private func sessionLabel(_ minutes: Int) -> String {
         switch minutes {
         case 0: "Until stopped"
         case 60: "1 hour"
-        case 60...: "\(minutes / 60) hours"
-        default: "\(minutes) min"
+        default: "\(minutes / 60) hours"
         }
+    }
+
+    private func intervalLabel(_ minutes: Int) -> String {
+        minutes == ReminderSession.variedInterval ? "Varied (15–30 min)" : "Every \(minutes) min"
     }
 }

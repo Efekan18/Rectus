@@ -10,17 +10,22 @@ final class ReminderPanel {
 
     private var panel: NSPanel?
     private var generation = 0          // bumped on every show(), so an old hide timer can't close a newer box
-    private let visibleSeconds = 5.0
 
-    func show(title: String, message: String, playSound: Bool) {
+    /// With `onCheck`, the box gets an "I'm upright" button and stays a little longer,
+    /// giving you time to actually sit up before confirming.
+    func show(title: String, message: String, playSound: Bool, onCheck: (() -> Void)? = nil) {
         generation += 1
         let current = generation
         let panel = self.panel ?? makePanel()
         self.panel = panel
 
-        let content = NSHostingView(rootView: ReminderView(title: title, message: message) { [weak self] in
-            self?.hide()
-        })
+        let view = ReminderView(title: title, message: message, showsCheck: onCheck != nil,
+                                onCheck: { [weak self] in
+                                    onCheck?()
+                                    self?.hide()
+                                },
+                                onDismiss: { [weak self] in self?.hide() })
+        let content = ClickThroughHostingView(rootView: view)
         panel.contentView = content
         panel.setContentSize(content.fittingSize)
         moveToTopCenter(panel)
@@ -36,8 +41,9 @@ final class ReminderPanel {
             NSSound(named: "Glass")?.play()
         }
 
+        let visibleSeconds = onCheck != nil ? 8.0 : 5.0
         Task { [weak self] in
-            try? await Task.sleep(for: .seconds(self?.visibleSeconds ?? 5))
+            try? await Task.sleep(for: .seconds(visibleSeconds))
             if self?.generation == current {
                 self?.hide()
             }
@@ -84,11 +90,19 @@ final class ReminderPanel {
     }
 }
 
+/// The panel never becomes the active window, so by default the first click would only
+/// "focus" it. This lets that first click hit the button directly.
+private final class ClickThroughHostingView<Content: View>: NSHostingView<Content> {
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+}
+
 /// The contents of the box.
 private struct ReminderView: View {
     let title: String
     let message: String
-    let onTap: () -> Void
+    let showsCheck: Bool
+    let onCheck: () -> Void
+    let onDismiss: () -> Void
 
     var body: some View {
         HStack(spacing: 14) {
@@ -99,11 +113,20 @@ private struct ReminderView: View {
                 Text(title).font(.headline)
                 Text(message).font(.subheadline).foregroundStyle(.secondary)
             }
+            if showsCheck {
+                Button(action: onCheck) {
+                    Label("I'm upright", systemImage: "checkmark")
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .padding(.leading, 6)
+            }
         }
         .padding(.horizontal, 22)
         .padding(.vertical, 14)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
-        .onTapGesture(perform: onTap)                 // click to dismiss early
+        .contentShape(RoundedRectangle(cornerRadius: 16))
+        .onTapGesture(perform: onDismiss)             // clicking elsewhere on the box just closes it
     }
 }
 

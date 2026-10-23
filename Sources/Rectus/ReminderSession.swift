@@ -1,32 +1,35 @@
 import Foundation
 import Observation
 
-/// Keeps the timing of one reminder session: when it ends, when the next reminder is
-/// due, and how many reminders have fired so far.
+/// Keeps the timing of one reminder session: when it ends and when the next reminder is due.
 @MainActor
 @Observable
 final class ReminderSession {
+    /// intervalMinutes value meaning "a random interval between 15 and 30 minutes".
+    nonisolated static let variedInterval = 0
+    /// Reminders are skipped if there has been no keyboard or mouse input for this long:
+    /// you're probably not at the desk.
+    static let idleThreshold: TimeInterval = 5 * 60
+
     private(set) var isActive = false
     private(set) var endDate: Date?          // nil = until stopped
     private(set) var nextReminder: Date?
-    private(set) var reminderCount = 0
-    private(set) var now = Date()            // updated every second; the UI reads this
 
-    private var interval: TimeInterval = 0
+    private var intervalMinutes = 20
     private var ticker: Task<Void, Never>?
 
     /// Called when a reminder is due (the panel + sound are hooked up here).
     var onReminder: () -> Void = {}
     /// Called when the session time runs out.
     var onFinish: () -> Void = {}
+    /// Seconds since the last user input. Replaceable so tests can fake it.
+    var idleSeconds: () -> TimeInterval = { 0 }
 
-    /// A sessionMinutes of 0 means the session runs until stopped.
+    /// sessionMinutes 0 = until stopped; intervalMinutes 0 = varied (15–30 min).
     func start(sessionMinutes: Int, intervalMinutes: Int, at start: Date = Date()) {
-        interval = TimeInterval(intervalMinutes * 60)
+        self.intervalMinutes = intervalMinutes
         endDate = sessionMinutes > 0 ? start.addingTimeInterval(TimeInterval(sessionMinutes * 60)) : nil
-        nextReminder = start.addingTimeInterval(interval)
-        reminderCount = 0
-        now = start
+        nextReminder = start.addingTimeInterval(nextInterval())
         isActive = true
 
         ticker?.cancel()
@@ -49,7 +52,6 @@ final class ReminderSession {
     /// Runs every second. Takes the time as a parameter so it can be tested.
     func tick(at time: Date = Date()) {
         guard isActive else { return }
-        now = time
 
         if let endDate, time >= endDate {
             stop()
@@ -58,25 +60,19 @@ final class ReminderSession {
         }
 
         if let next = nextReminder, time >= next {
-            reminderCount += 1
-            // Count the next one from "now": after the Mac wakes from sleep, missed
-            // reminders shouldn't fire back to back; a single one is enough.
-            nextReminder = time.addingTimeInterval(interval)
-            onReminder()
+            // Schedule the next one from "now", not from the old plan, so reminders
+            // can never pile up and fire back to back.
+            nextReminder = time.addingTimeInterval(nextInterval())
+            if idleSeconds() < Self.idleThreshold {
+                onReminder()
+            }
         }
     }
 
-    var secondsUntilNextReminder: TimeInterval? {
-        nextReminder.map { $0.timeIntervalSince(now) }
+    /// The fixed interval, or a fresh random one in varied mode. A slightly unpredictable
+    /// rhythm is harder to tune out than a reminder that comes like clockwork.
+    private func nextInterval() -> TimeInterval {
+        let minutes = intervalMinutes == Self.variedInterval ? Int.random(in: 15...30) : intervalMinutes
+        return TimeInterval(minutes * 60)
     }
-
-    var secondsUntilEnd: TimeInterval? {
-        endDate.map { $0.timeIntervalSince(now) }
-    }
-}
-
-/// Converts seconds left to minutes, rounded up: 1200 s → 20, 1199 s → 20, 30 s → 1.
-/// Rounding up means it never says "0 min" while you're still waiting.
-func minutesLeft(_ seconds: TimeInterval) -> Int {
-    max(0, Int((seconds / 60).rounded(.up)))
 }
